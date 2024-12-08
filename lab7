@@ -1,0 +1,121 @@
+import java.sql.*; // Import SQL classes
+
+public class Employee {
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String hireDate;
+    private double salary;
+    private String ssn;
+
+    public Employee(String vfname, String vlname, String vemail, String vhireDate, double vsalary, String vssn) {
+        this.firstName = vfname;
+        this.lastName = vlname;
+        this.email = vemail;
+        this.hireDate = vhireDate;
+        this.salary = vsalary;
+        this.ssn = vssn;
+        
+        if (validateEmployeeData()) {
+            System.out.println("\n\nData was screened and passed\n Beginning the SQL database INSERT.");
+            insertEmployee();
+        } else {
+            System.out.println("\n\nData was screened and FAILED\n Abandoned the SQL database INSERT.");
+        }
+    }
+
+    private boolean validateEmployeeData() {
+        String[] sqlKeywords = {
+            "CREATE", "DROP", "ALTER", "TRUNCATE", 
+            "DELETE", "RENAME", "INSERT", "UPDATE", 
+            "SHOW", "MODIFY"
+        };
+
+        String[] fieldsToCheck = {firstName, lastName, email, hireDate, ssn};
+        
+        for (String field : fieldsToCheck) {
+            if (field == null) continue;
+            String upperField = field.toUpperCase();
+            
+            for (String keyword : sqlKeywords) {
+                if (upperField.contains(keyword)) {
+                    System.out.println("SQL Injection detected in: " + field);
+                    return false;
+                }
+            }
+            
+            if (field.contains("'") || field.contains(";") || 
+                field.contains("--") || field.contains("/*") || 
+                field.contains("*/")) {
+                System.out.println("Suspicious characters detected in: " + field);
+                return false;
+            }
+        }
+
+        if (firstName.length() > 50 || lastName.length() > 50) {
+            System.out.println("Name too long");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void insertEmployee() {
+        String url = "jdbc:mysql://localhost:3306/EmployeeData";
+        String user = "root";
+        String password = "jermaine";
+
+        // SQL query to calculate the next empid
+        String getNextEmpIdSql = "SELECT MAX(empid) + 1 AS nextEmpId FROM employees";
+
+        // SQL query to insert the new employee
+        String insertSql = "INSERT INTO employees " +
+                           "(empid, fname, lname, email, HireDate, salary, ssn) " +
+                           "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = DriverManager.getConnection(url, user, password);
+             PreparedStatement getIdStmt = conn.prepareStatement(getNextEmpIdSql);
+             PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+
+            // Calculate the next empid
+            int nextEmpId = 1; // Default to 1 if table is empty
+            try (ResultSet rs = getIdStmt.executeQuery()) {
+                if (rs.next()) {
+                    nextEmpId = rs.getInt("nextEmpId");
+                }
+            }
+
+            // Set parameters for the insert statement
+            insertStmt.setInt(1, nextEmpId); // Manually set empid
+            insertStmt.setString(2, firstName);
+            insertStmt.setString(3, lastName);
+            insertStmt.setString(4, email);
+            insertStmt.setString(5, hireDate);
+            insertStmt.setDouble(6, salary);
+            insertStmt.setString(7, ssn);
+
+            // Execute insert
+            int rowsAffected = insertStmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                System.out.println("Inserted employee with ID: " + nextEmpId);
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Database insertion error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "Employee{" +
+               "firstName='" + firstName + '\'' +
+               ", lastName='" + lastName + '\'' +
+               ", email='" + email + '\'' +
+               ", hireDate='" + hireDate + '\'' +
+               ", salary=" + salary +
+               ", ssn='" + ssn + '\'' +
+               '}';
+    }
+}
